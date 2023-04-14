@@ -1,0 +1,37 @@
+project_name: kubedump
+
+before:
+  hooks:
+    - go mod download
+builds:
+  - main: ./main.go
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+archives:
+  - format: binary
+checksum:
+  name_template: "checksums.txt"
+snapshot:
+  name_template: "{{ .Tag }}-next-{{.Commit}}"
+brews:
+  - name: kubedump
+    skip_upload: auto
+    tap:
+      owner: sj14
+      name: homebrew-tap
+    description: "Tool for dumping manifests from your Kubernetes clusters"
+release:
+  github:
+    owner: sj14
+    name: kubedump
+  disable: false
+  draft: false
+  prerelease: auto
+changelog:
+  filters:
+    exclude:
+      - typo
