@@ -31,7 +31,7 @@ Usage of kubedump:
   -clusterscoped
         dump cluster-wide resources (default true)
   -config string
-        path to the kubeconfig (default "/Users/simon/.kube/config")
+        path to the kubeconfig (default "~/.kube/config")
   -context string
         context from the kubeconfig, empty for default
   -dir string
