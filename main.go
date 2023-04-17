@@ -41,6 +41,7 @@ func main() {
 		namespacesFlag    = flag.String("namespaces", "", "namespace to dump (e.g. 'ns1,ns2'), empty for all")
 		clusterscopedFlag = flag.Bool("clusterscoped", true, "dump cluster-wide resources")
 		namespacedFlag    = flag.Bool("namespaced", true, "dump namespaced resources")
+		statelessFlag     = flag.Bool("stateless", true, "remove fields containing a state of the resource")
 		versionFlag       = flag.Bool("version", false, fmt.Sprintf("print version information of this release (%v)", version))
 	)
 	flag.Parse()
@@ -129,7 +130,7 @@ func main() {
 						continue
 					}
 
-					if err := writeYAML(*outdirFlag, res.Name, *item); err != nil {
+					if err := writeYAML(*outdirFlag, res.Name, *item, *statelessFlag); err != nil {
 						log.Printf("failed writing %v: %v\n", namespacedName, err)
 						continue
 					}
@@ -140,8 +141,11 @@ func main() {
 }
 
 // TODO: check if we can get the resourceName from the item
-// TODO: remove status etc. from the output?
-func writeYAML(outDir, resourceName string, item unstructured.Unstructured) error {
+func writeYAML(outDir, resourceName string, item unstructured.Unstructured, stateless bool) error {
+	if stateless {
+		cleanState(item)
+	}
+
 	yamlBytes, err := yaml.Marshal(item.Object)
 	if err != nil {
 		return fmt.Errorf("failed marshalling: %v", err)
@@ -164,6 +168,61 @@ func writeYAML(outDir, resourceName string, item unstructured.Unstructured) erro
 	}
 
 	return nil
+}
+
+func cleanState(item unstructured.Unstructured) {
+	// partially based on https://github.com/WoozyMasta/kube-dump/blob/f1ae560a8b9da8dba1c28619f38089d40d0d2357/kube-dump#L334
+
+	// cluster-scoped and namespaced
+	item.Object = deleteField(item.Object, "metadata", "annotations", "control-plane.alpha.kubernetes.io/leader")
+	item.Object = deleteField(item.Object, "metadata", "annotations", "kubectl.kubernetes.io/last-applied-configuration")
+	item.Object = deleteField(item.Object, "metadata", "creationTimestamp")
+	item.Object = deleteField(item.Object, "metadata", "finalizers")
+	item.Object = deleteField(item.Object, "metadata", "generation")
+	item.Object = deleteField(item.Object, "metadata", "managedFields")
+	item.Object = deleteField(item.Object, "metadata", "resourceVersion")
+	item.Object = deleteField(item.Object, "metadata", "selfLink")
+	item.Object = deleteField(item.Object, "metadata", "ownerReferences")
+	item.Object = deleteField(item.Object, "metadata", "uid")
+	item.Object = deleteField(item.Object, "status")
+
+	if item.GetNamespace() == "" {
+		// cluster-scoped only
+	} else {
+		// namespaced only
+		item.Object = deleteField(item.Object, "metadata", "annotations", "autoscaling.alpha.kubernetes.io/conditions")
+		item.Object = deleteField(item.Object, "metadata", "annotations", "autoscaling.alpha.kubernetes.io/current-metrics")
+		item.Object = deleteField(item.Object, "metadata", "annotations", "deployment.kubernetes.io/revision")
+		item.Object = deleteField(item.Object, "metadata", "annotations", "kubernetes.io/config.seen")
+		item.Object = deleteField(item.Object, "metadata", "annotations", "kubernetes.io/service-account.uid")
+		item.Object = deleteField(item.Object, "metadata", "annotations", "pv.kubernetes.io/bind-completed")
+		item.Object = deleteField(item.Object, "metadata", "annotations", "pv.kubernetes.io/bound-by-controller")
+		item.Object = deleteField(item.Object, "metadata", "clusterIP")
+		item.Object = deleteField(item.Object, "metadata", "progressDeadlineSeconds")
+		item.Object = deleteField(item.Object, "metadata", "revisionHistoryLimit")
+		item.Object = deleteField(item.Object, "metadata", "spec", "metadata", "annotations", "kubectl.kubernetes.io/restartedAt")
+		item.Object = deleteField(item.Object, "metadata", "spec", "metadata", "creationTimestamp")
+		item.Object = deleteField(item.Object, "spec", "volumeName")
+		item.Object = deleteField(item.Object, "spec", "volumeMode")
+	}
+}
+
+func deleteField(object map[string]interface{}, path ...string) map[string]interface{} {
+	if len(path) == 0 {
+		return object
+	}
+	if len(path) == 1 {
+		delete(object, path[0])
+		return object
+	}
+
+	subObj, ok := object[path[0]].(map[string]interface{})
+	if !ok {
+		return object
+	}
+
+	object[path[0]] = deleteField(subObj, path[1:]...)
+	return object
 }
 
 // https://github.com/kubernetes/client-go/issues/192#issuecomment-349564767
