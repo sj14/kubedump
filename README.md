@@ -42,6 +42,8 @@ Usage of kubedump:
         namespace to dump (e.g. 'ns1,ns2'), empty for all
   -resources string
         resource to dump (e.g. 'configmaps,secrets'), empty for all
+  -stateless
+        remove fields containing a state of the resource (default true)
   -version
         print version information of this release
 ```
