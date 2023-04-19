@@ -44,6 +44,8 @@ Usage of kubedump:
         resource to dump (e.g. 'configmaps,secrets'), empty for all
   -stateless
         remove fields containing a state of the resource (default true)
+  -verbose
+        output the current progress
   -version
         print version information of this release
 ```
