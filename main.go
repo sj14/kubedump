@@ -239,5 +239,7 @@ func buildConfigFromFlags(context, kubeconfigPath string) (*rest.Config, error) 
 	// https://kubernetes.io/blog/2020/09/03/warnings/#customize-client-handling
 	config = rest.CopyConfig(config)
 	config.WarningHandler = rest.NoWarnings{}
+	config.QPS = 100
+	config.Burst = 300
 	return config, nil
 }
