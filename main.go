@@ -130,7 +130,13 @@ func main() {
 						continue
 					}
 
-					if err := writeYAML(*outdirFlag, res.Name, *item, *statelessFlag); err != nil {
+					// Use a combination of resource and group name as it might not be unique otherwise.
+					// Example content of the variables:
+					//		resource: "pod"		group: ""
+					//		resource: "pod"		group: "metrics.k8s.io"
+					resourceAndGroup := strings.TrimSuffix(fmt.Sprintf("%s.%s", res.Name, group.Name), ".")
+
+					if err := writeYAML(*outdirFlag, resourceAndGroup, *item, *statelessFlag); err != nil {
 						log.Printf("failed writing %v: %v\n", namespacedName, err)
 						continue
 					}
@@ -140,8 +146,7 @@ func main() {
 	}
 }
 
-// TODO: check if we can get the resourceName from the item
-func writeYAML(outDir, resourceName string, item unstructured.Unstructured, stateless bool) error {
+func writeYAML(outDir, resourceAndGroup string, item unstructured.Unstructured, stateless bool) error {
 	if stateless {
 		cleanState(item)
 	}
@@ -156,7 +161,7 @@ func writeYAML(outDir, resourceName string, item unstructured.Unstructured, stat
 		namespace = filepath.Join("namespaced", item.GetNamespace())
 	}
 
-	dir := filepath.Join(outDir, namespace, resourceName)
+	dir := filepath.Join(outDir, namespace, resourceAndGroup)
 	if err = os.MkdirAll(dir, os.ModePerm); err != nil {
 		return fmt.Errorf("failed creating dir %q: %v", dir, err)
 	}
