@@ -87,6 +87,11 @@ func main() {
 			}
 
 			for _, res := range resources.APIResources {
+				if !slices.Contains(res.Verbs, "get") {
+					// we can't get the resource, so let's skip it
+					continue
+				}
+
 				if strings.Contains(res.Name, "/") {
 					// skip subresources
 					// TODO: probably there is a better way to not get them in the first place
