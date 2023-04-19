@@ -10,13 +10,12 @@ import (
 	"strings"
 
 	"golang.org/x/exp/slices"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 )
 
@@ -73,9 +72,9 @@ func main() {
 		log.Fatalf("failed getting server groups: %v\n", err)
 	}
 
-	dynamicClient, err := dynamic.NewForConfig(kubeConfig)
+	k8sClient, err := client.New(kubeConfig, client.Options{})
 	if err != nil {
-		log.Fatalf("failed creating dynamic client: %v\n", err)
+		log.Fatalf("failed creating Kubernetes client: %v\n", err)
 	}
 
 	for _, group := range groups.Groups {
@@ -98,15 +97,15 @@ func main() {
 					continue
 				}
 
-				gvr := schema.GroupVersionResource{
-					Group:    group.Name,
-					Version:  version.Version,
-					Resource: res.Name,
-				}
-
-				unstrList, err := dynamicClient.Resource(gvr).List(context.Background(), metav1.ListOptions{})
+				unstrList := &unstructured.UnstructuredList{}
+				unstrList.SetGroupVersionKind(schema.GroupVersionKind{
+					Group:   group.Name,
+					Version: version.Version,
+					Kind:    res.Kind,
+				})
+				err = k8sClient.List(context.Background(), unstrList)
 				if err != nil {
-					log.Printf("failed listing %v: %v\n", gvr.String(), err)
+					log.Printf("failed listing %v: %v\n", unstrList.GroupVersionKind().String(), err)
 					continue
 				}
 
@@ -124,7 +123,14 @@ func main() {
 
 					namespacedName := fmt.Sprintf("%v/%v", listItem.GetNamespace(), listItem.GetName())
 
-					item, err := dynamicClient.Resource(gvr).Namespace(listItem.GetNamespace()).Get(context.Background(), listItem.GetName(), metav1.GetOptions{})
+					item := &unstructured.Unstructured{}
+					item.SetGroupVersionKind(schema.GroupVersionKind{
+						Group:   group.Name,
+						Version: version.Version,
+						Kind:    res.Kind,
+					})
+
+					err := k8sClient.Get(context.Background(), client.ObjectKeyFromObject(&listItem), item)
 					if err != nil {
 						log.Printf("failed getting %v: %v\n", namespacedName, err)
 						continue
@@ -239,5 +245,7 @@ func buildConfigFromFlags(context, kubeconfigPath string) (*rest.Config, error) 
 	// https://kubernetes.io/blog/2020/09/03/warnings/#customize-client-handling
 	config = rest.CopyConfig(config)
 	config.WarningHandler = rest.NoWarnings{}
+	config.QPS = 100
+	config.Burst = 300
 	return config, nil
 }
