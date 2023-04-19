@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"golang.org/x/exp/slices"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,6 +35,8 @@ func main() {
 	}
 
 	var (
+		start = time.Now()
+
 		kubeConfigPath    = flag.String("config", filepath.Join(homeDir, ".kube", "config"), "path to the kubeconfig")
 		kubeContext       = flag.String("context", "", "context from the kubeconfig, empty for default")
 		outdirFlag        = flag.String("dir", "dump", "output directory for the dumps")
@@ -42,6 +45,7 @@ func main() {
 		clusterscopedFlag = flag.Bool("clusterscoped", true, "dump cluster-wide resources")
 		namespacedFlag    = flag.Bool("namespaced", true, "dump namespaced resources")
 		statelessFlag     = flag.Bool("stateless", true, "remove fields containing a state of the resource")
+		verboseFlag       = flag.Bool("verbose", false, "output the current progress")
 		versionFlag       = flag.Bool("version", false, fmt.Sprintf("print version information of this release (%v)", version))
 	)
 	flag.Parse()
@@ -78,6 +82,7 @@ func main() {
 		log.Fatalf("failed creating dynamic client: %v\n", err)
 	}
 
+	written := 0
 	for _, group := range groups.Groups {
 		for _, version := range group.Versions {
 			resources, err := clientset.DiscoveryClient.ServerResourcesForGroupVersion(version.GroupVersion)
@@ -107,6 +112,10 @@ func main() {
 					Group:    group.Name,
 					Version:  version.Version,
 					Resource: res.Name,
+				}
+
+				if *verboseFlag {
+					fmt.Printf("processing: %s\n", gvr.String())
 				}
 
 				unstrList, err := dynamicClient.Resource(gvr).List(context.Background(), metav1.ListOptions{})
@@ -145,10 +154,12 @@ func main() {
 						log.Printf("failed writing %v: %v\n", namespacedName, err)
 						continue
 					}
+					written++
 				}
 			}
 		}
 	}
+	fmt.Printf("loaded %d manifests in %v\n", written, time.Since(start).Round(1*time.Millisecond))
 }
 
 func writeYAML(outDir, resourceAndGroup string, item unstructured.Unstructured, stateless bool) error {
