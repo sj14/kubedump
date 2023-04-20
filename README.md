@@ -48,6 +48,8 @@ Usage of kubedump:
         resource to dump (e.g. 'configmaps,secrets'), empty for all
   -stateless
         remove fields containing a state of the resource (default true)
+  -threads uint
+        maximum number of threads (minimum 1) (default 10)
   -verbose
         output the current progress
   -version
