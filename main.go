@@ -116,16 +116,8 @@ func main() {
 					continue
 				}
 
-				for _, listItem := range unstrList.Items {
-					if skipItem(listItem, *namespacedFlag, *clusterscopedFlag, wantNamespaces, ignoreNamespaces) {
-						continue
-					}
-
-					namespacedName := fmt.Sprintf("%v/%v", listItem.GetNamespace(), listItem.GetName())
-
-					item, err := dynamicClient.Resource(gvr).Namespace(listItem.GetNamespace()).Get(context.Background(), listItem.GetName(), metav1.GetOptions{})
-					if err != nil {
-						log.Printf("failed getting %v: %v\n", namespacedName, err)
+				for _, item := range unstrList.Items {
+					if skipItem(item, *namespacedFlag, *clusterscopedFlag, wantNamespaces, ignoreNamespaces) {
 						continue
 					}
 
@@ -135,8 +127,8 @@ func main() {
 					//		resource: "pod"		group: "metrics.k8s.io"
 					resourceAndGroup := strings.TrimSuffix(fmt.Sprintf("%s.%s", res.Name, group.Name), ".")
 
-					if err := writeYAML(*outdirFlag, resourceAndGroup, *item, *statelessFlag); err != nil {
-						log.Printf("failed writing %v: %v\n", namespacedName, err)
+					if err := writeYAML(*outdirFlag, resourceAndGroup, item, *statelessFlag); err != nil {
+						log.Printf("failed writing %v/%v: %v\n", item.GetNamespace(), item.GetName(), err)
 						continue
 					}
 					written++
