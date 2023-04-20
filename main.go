@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/exp/slices"
@@ -44,6 +46,7 @@ func main() {
 		ignoreResourcesFlag  = flag.String("ignore-resources", "", "resource to ignore (e.g. 'configmaps,secrets')")
 		namespacesFlag       = flag.String("namespaces", "", "namespace to dump (e.g. 'ns1,ns2'), empty for all")
 		ignoreNamespacesFlag = flag.String("ignore-namespaces", "", "namespace to ignore (e.g. 'ns1,ns2')")
+		maxThreadsFlag       = flag.Uint("threads", 10, "maximum number of threads (minimum 1)")
 		clusterscopedFlag    = flag.Bool("clusterscoped", true, "dump cluster-wide resources")
 		namespacedFlag       = flag.Bool("namespaced", true, "dump namespaced resources")
 		statelessFlag        = flag.Bool("stateless", true, "remove fields containing a state of the resource")
@@ -57,6 +60,10 @@ func main() {
 		fmt.Printf("commit: %v\n", commit)
 		fmt.Printf("date: %v\n", date)
 		os.Exit(0)
+	}
+
+	if *maxThreadsFlag <= 0 {
+		log.Fatalln("minimum number of threads is 1")
 	}
 
 	var (
@@ -86,7 +93,12 @@ func main() {
 		log.Fatalf("failed creating dynamic client: %v\n", err)
 	}
 
-	written := 0
+	var (
+		writtenFiles uint64
+		waitGroup    sync.WaitGroup
+		threadGuard  = make(chan struct{}, *maxThreadsFlag)
+	)
+
 	for _, group := range groups.Groups {
 		for _, version := range group.Versions {
 			resources, err := clientset.DiscoveryClient.ServerResourcesForGroupVersion(version.GroupVersion)
@@ -95,48 +107,60 @@ func main() {
 				continue
 			}
 
+			waitGroup.Add(len(resources.APIResources))
 			for _, res := range resources.APIResources {
-				if skipResource(res, wantResources, ignoreResources) {
-					continue
-				}
+				threadGuard <- struct{}{} // would block if guard channel is already filled
 
-				gvr := schema.GroupVersionResource{
-					Group:    group.Name,
-					Version:  version.Version,
-					Resource: res.Name,
-				}
+				go func(res metav1.APIResource, group metav1.APIGroup, version metav1.GroupVersionForDiscovery) {
+					defer func() {
+						waitGroup.Done()
+						<-threadGuard
+					}()
 
-				if *verboseFlag {
-					fmt.Printf("processing: %s\n", gvr.String())
-				}
-
-				unstrList, err := dynamicClient.Resource(gvr).List(context.Background(), metav1.ListOptions{})
-				if err != nil {
-					log.Printf("failed listing %v: %v\n", gvr.String(), err)
-					continue
-				}
-
-				for _, item := range unstrList.Items {
-					if skipItem(item, *namespacedFlag, *clusterscopedFlag, wantNamespaces, ignoreNamespaces) {
-						continue
+					if skipResource(res, wantResources, ignoreResources) {
+						return
 					}
 
-					// Use a combination of resource and group name as it might not be unique otherwise.
-					// Example content of the variables:
-					//		resource: "pod"		group: ""
-					//		resource: "pod"		group: "metrics.k8s.io"
-					resourceAndGroup := strings.TrimSuffix(fmt.Sprintf("%s.%s", res.Name, group.Name), ".")
-
-					if err := writeYAML(*outdirFlag, resourceAndGroup, item, *statelessFlag); err != nil {
-						log.Printf("failed writing %v/%v: %v\n", item.GetNamespace(), item.GetName(), err)
-						continue
+					gvr := schema.GroupVersionResource{
+						Group:    group.Name,
+						Version:  version.Version,
+						Resource: res.Name,
 					}
-					written++
-				}
+
+					if *verboseFlag {
+						fmt.Printf("processing: %s\n", gvr.String())
+					}
+
+					unstrList, err := dynamicClient.Resource(gvr).List(context.Background(), metav1.ListOptions{})
+					if err != nil {
+						log.Printf("failed listing %v: %v\n", gvr.String(), err)
+						return
+					}
+
+					for _, item := range unstrList.Items {
+						if skipItem(item, *namespacedFlag, *clusterscopedFlag, wantNamespaces, ignoreNamespaces) {
+							continue
+						}
+
+						// Use a combination of resource and group name as it might not be unique otherwise.
+						// Example content of the variables:
+						//		resource: "pod"		group: ""
+						//		resource: "pod"		group: "metrics.k8s.io"
+						resourceAndGroup := strings.TrimSuffix(fmt.Sprintf("%s.%s", res.Name, group.Name), ".")
+
+						if err := writeYAML(*outdirFlag, resourceAndGroup, item, *statelessFlag); err != nil {
+							log.Printf("failed writing %v/%v: %v\n", item.GetNamespace(), item.GetName(), err)
+							continue
+						}
+						atomic.AddUint64(&writtenFiles, 1)
+					}
+				}(res, group, version)
 			}
 		}
 	}
-	fmt.Printf("loaded %d manifests in %v\n", written, time.Since(start).Round(1*time.Millisecond))
+
+	waitGroup.Wait()
+	fmt.Printf("loaded %d manifests in %v\n", writtenFiles, time.Since(start).Round(1*time.Millisecond))
 }
 
 func skipResource(res metav1.APIResource, wantResources, ignoreResources []string) bool {
