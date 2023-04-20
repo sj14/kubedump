@@ -36,6 +36,10 @@ Usage of kubedump:
         context from the kubeconfig, empty for default
   -dir string
         output directory for the dumps (default "dump")
+  -ignore-namespaces string
+        namespace to ignore (e.g. 'ns1,ns2')
+  -ignore-resources string
+        resource to ignore (e.g. 'configmaps,secrets')
   -namespaced
         dump namespaced resources (default true)
   -namespaces string
