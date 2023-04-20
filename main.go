@@ -226,55 +226,37 @@ func cleanState(item unstructured.Unstructured) {
 	// partially based on https://github.com/WoozyMasta/kube-dump/blob/f1ae560a8b9da8dba1c28619f38089d40d0d2357/kube-dump#L334
 
 	// cluster-scoped and namespaced
-	item.Object = deleteField(item.Object, "metadata", "annotations", "control-plane.alpha.kubernetes.io/leader")
-	item.Object = deleteField(item.Object, "metadata", "annotations", "kubectl.kubernetes.io/last-applied-configuration")
-	item.Object = deleteField(item.Object, "metadata", "creationTimestamp")
-	item.Object = deleteField(item.Object, "metadata", "finalizers")
-	item.Object = deleteField(item.Object, "metadata", "generation")
-	item.Object = deleteField(item.Object, "metadata", "managedFields")
-	item.Object = deleteField(item.Object, "metadata", "resourceVersion")
-	item.Object = deleteField(item.Object, "metadata", "selfLink")
-	item.Object = deleteField(item.Object, "metadata", "ownerReferences")
-	item.Object = deleteField(item.Object, "metadata", "uid")
-	item.Object = deleteField(item.Object, "status")
+	unstructured.RemoveNestedField(item.Object, "metadata", "annotations", "control-plane.alpha.kubernetes.io/leader")
+	unstructured.RemoveNestedField(item.Object, "metadata", "annotations", "kubectl.kubernetes.io/last-applied-configuration")
+	unstructured.RemoveNestedField(item.Object, "metadata", "creationTimestamp")
+	unstructured.RemoveNestedField(item.Object, "metadata", "finalizers")
+	unstructured.RemoveNestedField(item.Object, "metadata", "generation")
+	unstructured.RemoveNestedField(item.Object, "metadata", "managedFields")
+	unstructured.RemoveNestedField(item.Object, "metadata", "resourceVersion")
+	unstructured.RemoveNestedField(item.Object, "metadata", "selfLink")
+	unstructured.RemoveNestedField(item.Object, "metadata", "ownerReferences")
+	unstructured.RemoveNestedField(item.Object, "metadata", "uid")
+	unstructured.RemoveNestedField(item.Object, "status")
 
 	if item.GetNamespace() == "" {
 		// cluster-scoped only
 	} else {
 		// namespaced only
-		item.Object = deleteField(item.Object, "metadata", "annotations", "autoscaling.alpha.kubernetes.io/conditions")
-		item.Object = deleteField(item.Object, "metadata", "annotations", "autoscaling.alpha.kubernetes.io/current-metrics")
-		item.Object = deleteField(item.Object, "metadata", "annotations", "deployment.kubernetes.io/revision")
-		item.Object = deleteField(item.Object, "metadata", "annotations", "kubernetes.io/config.seen")
-		item.Object = deleteField(item.Object, "metadata", "annotations", "kubernetes.io/service-account.uid")
-		item.Object = deleteField(item.Object, "metadata", "annotations", "pv.kubernetes.io/bind-completed")
-		item.Object = deleteField(item.Object, "metadata", "annotations", "pv.kubernetes.io/bound-by-controller")
-		item.Object = deleteField(item.Object, "metadata", "clusterIP")
-		item.Object = deleteField(item.Object, "metadata", "progressDeadlineSeconds")
-		item.Object = deleteField(item.Object, "metadata", "revisionHistoryLimit")
-		item.Object = deleteField(item.Object, "metadata", "spec", "metadata", "annotations", "kubectl.kubernetes.io/restartedAt")
-		item.Object = deleteField(item.Object, "metadata", "spec", "metadata", "creationTimestamp")
-		item.Object = deleteField(item.Object, "spec", "volumeName")
-		item.Object = deleteField(item.Object, "spec", "volumeMode")
+		unstructured.RemoveNestedField(item.Object, "metadata", "annotations", "autoscaling.alpha.kubernetes.io/conditions")
+		unstructured.RemoveNestedField(item.Object, "metadata", "annotations", "autoscaling.alpha.kubernetes.io/current-metrics")
+		unstructured.RemoveNestedField(item.Object, "metadata", "annotations", "deployment.kubernetes.io/revision")
+		unstructured.RemoveNestedField(item.Object, "metadata", "annotations", "kubernetes.io/config.seen")
+		unstructured.RemoveNestedField(item.Object, "metadata", "annotations", "kubernetes.io/service-account.uid")
+		unstructured.RemoveNestedField(item.Object, "metadata", "annotations", "pv.kubernetes.io/bind-completed")
+		unstructured.RemoveNestedField(item.Object, "metadata", "annotations", "pv.kubernetes.io/bound-by-controller")
+		unstructured.RemoveNestedField(item.Object, "metadata", "clusterIP")
+		unstructured.RemoveNestedField(item.Object, "metadata", "progressDeadlineSeconds")
+		unstructured.RemoveNestedField(item.Object, "metadata", "revisionHistoryLimit")
+		unstructured.RemoveNestedField(item.Object, "metadata", "spec", "metadata", "annotations", "kubectl.kubernetes.io/restartedAt")
+		unstructured.RemoveNestedField(item.Object, "metadata", "spec", "metadata", "creationTimestamp")
+		unstructured.RemoveNestedField(item.Object, "spec", "volumeName")
+		unstructured.RemoveNestedField(item.Object, "spec", "volumeMode")
 	}
-}
-
-func deleteField(object map[string]interface{}, path ...string) map[string]interface{} {
-	if len(path) == 0 {
-		return object
-	}
-	if len(path) == 1 {
-		delete(object, path[0])
-		return object
-	}
-
-	subObj, ok := object[path[0]].(map[string]interface{})
-	if !ok {
-		return object
-	}
-
-	object[path[0]] = deleteField(subObj, path[1:]...)
-	return object
 }
 
 // https://github.com/kubernetes/client-go/issues/192#issuecomment-349564767
