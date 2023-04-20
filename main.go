@@ -29,24 +29,26 @@ var (
 )
 
 func main() {
+	start := time.Now()
+
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		log.Fatalf("failed getting user home dir: %v\n", err)
 	}
 
 	var (
-		start = time.Now()
-
-		kubeConfigPath    = flag.String("config", filepath.Join(homeDir, ".kube", "config"), "path to the kubeconfig")
-		kubeContext       = flag.String("context", "", "context from the kubeconfig, empty for default")
-		outdirFlag        = flag.String("dir", "dump", "output directory for the dumps")
-		resourcesFlag     = flag.String("resources", "", "resource to dump (e.g. 'configmaps,secrets'), empty for all")
-		namespacesFlag    = flag.String("namespaces", "", "namespace to dump (e.g. 'ns1,ns2'), empty for all")
-		clusterscopedFlag = flag.Bool("clusterscoped", true, "dump cluster-wide resources")
-		namespacedFlag    = flag.Bool("namespaced", true, "dump namespaced resources")
-		statelessFlag     = flag.Bool("stateless", true, "remove fields containing a state of the resource")
-		verboseFlag       = flag.Bool("verbose", false, "output the current progress")
-		versionFlag       = flag.Bool("version", false, fmt.Sprintf("print version information of this release (%v)", version))
+		kubeConfigPath       = flag.String("config", filepath.Join(homeDir, ".kube", "config"), "path to the kubeconfig")
+		kubeContext          = flag.String("context", "", "context from the kubeconfig, empty for default")
+		outdirFlag           = flag.String("dir", "dump", "output directory for the dumps")
+		resourcesFlag        = flag.String("resources", "", "resource to dump (e.g. 'configmaps,secrets'), empty for all")
+		ignoreResourcesFlag  = flag.String("ignore-resources", "", "resource to ignore (e.g. 'configmaps,secrets')")
+		namespacesFlag       = flag.String("namespaces", "", "namespace to dump (e.g. 'ns1,ns2'), empty for all")
+		ignoreNamespacesFlag = flag.String("ignore-namespaces", "", "namespace to ignore (e.g. 'ns1,ns2')")
+		clusterscopedFlag    = flag.Bool("clusterscoped", true, "dump cluster-wide resources")
+		namespacedFlag       = flag.Bool("namespaced", true, "dump namespaced resources")
+		statelessFlag        = flag.Bool("stateless", true, "remove fields containing a state of the resource")
+		verboseFlag          = flag.Bool("verbose", false, "output the current progress")
+		versionFlag          = flag.Bool("version", false, fmt.Sprintf("print version information of this release (%v)", version))
 	)
 	flag.Parse()
 
@@ -58,8 +60,10 @@ func main() {
 	}
 
 	var (
-		wantResources  = strings.Split(strings.ToLower(*resourcesFlag), ",")
-		wantNamespaces = strings.Split(strings.ToLower(*namespacesFlag), ",")
+		wantResources    = strings.Split(strings.ToLower(*resourcesFlag), ",")
+		wantNamespaces   = strings.Split(strings.ToLower(*namespacesFlag), ",")
+		ignoreResources  = strings.Split(strings.ToLower(*ignoreResourcesFlag), ",")
+		ignoreNamespaces = strings.Split(strings.ToLower(*ignoreNamespacesFlag), ",")
 	)
 
 	kubeConfig, err := buildConfigFromFlags(*kubeContext, *kubeConfigPath)
@@ -92,19 +96,7 @@ func main() {
 			}
 
 			for _, res := range resources.APIResources {
-				if !slices.Contains(res.Verbs, "get") {
-					// we can't get the resource, so let's skip it
-					continue
-				}
-
-				if strings.Contains(res.Name, "/") {
-					// skip subresources
-					// TODO: probably there is a better way to not get them in the first place
-					continue
-				}
-
-				// check if we got the specified resources (if any resources were specified)
-				if *resourcesFlag != "" && !slices.Contains(wantResources, res.Name) {
+				if skipResource(res, wantResources, ignoreResources) {
 					continue
 				}
 
@@ -125,14 +117,7 @@ func main() {
 				}
 
 				for _, listItem := range unstrList.Items {
-					// filter according to flags
-					if listItem.GetNamespace() != "" && !*namespacedFlag {
-						continue
-					}
-					if listItem.GetNamespace() == "" && !*clusterscopedFlag {
-						continue
-					}
-					if *namespacesFlag != "" && !slices.Contains(wantNamespaces, listItem.GetNamespace()) {
+					if skipItem(listItem, *namespacedFlag, *clusterscopedFlag, wantNamespaces, ignoreNamespaces) {
 						continue
 					}
 
@@ -160,6 +145,52 @@ func main() {
 		}
 	}
 	fmt.Printf("loaded %d manifests in %v\n", written, time.Since(start).Round(1*time.Millisecond))
+}
+
+func skipResource(res metav1.APIResource, wantResources, ignoreResources []string) bool {
+	// check if we can even 'get' the resource
+	if !slices.Contains(res.Verbs, "get") {
+		return true
+	}
+
+	// skip subresources
+	// TODO: maybe there is a better way to not get them in the first place
+	if strings.Contains(res.Name, "/") {
+		return true
+	}
+
+	// check if we got the specified resources (if any resources were specified)
+	if len(wantResources) > 0 && wantResources[0] != "" && !slices.Contains(wantResources, res.Name) {
+		return true
+	}
+
+	// check if we got a resource to ignore (if any resources were specified)
+	if len(ignoreResources) > 0 && ignoreResources[0] != "" && slices.Contains(ignoreResources, res.Name) {
+		return true
+	}
+
+	return false
+}
+
+func skipItem(item unstructured.Unstructured, namespaced, clusterscoped bool, wantNamespaces, ignoreNamespaces []string) bool {
+	// item with namespace but we skip namespaced items
+	if item.GetNamespace() != "" && !namespaced {
+		return true
+	}
+	// item clusterscoped but we skip them
+	if item.GetNamespace() == "" && !clusterscoped {
+		return true
+	}
+	// specific namespaces specied but doesn't match
+	if len(wantNamespaces) > 0 && wantNamespaces[0] != "" && !slices.Contains(wantNamespaces, item.GetNamespace()) {
+		return true
+	}
+	// ignore specific namespaces and it matches
+	if len(ignoreNamespaces) > 0 && ignoreNamespaces[0] != "" && slices.Contains(ignoreNamespaces, item.GetNamespace()) {
+		return true
+	}
+
+	return false
 }
 
 func writeYAML(outDir, resourceAndGroup string, item unstructured.Unstructured, stateless bool) error {
