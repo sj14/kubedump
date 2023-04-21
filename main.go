@@ -39,7 +39,7 @@ func main() {
 	}
 
 	var (
-		kubeConfigPath       = flag.String("config", filepath.Join(homeDir, ".kube", "config"), "path to the kubeconfig")
+		kubeConfigPath       = flag.String("config", filepath.Join(homeDir, ".kube", "config"), "path to the kubeconfig, empty for in-cluster config")
 		kubeContext          = flag.String("context", "", "context from the kubeconfig, empty for default")
 		outdirFlag           = flag.String("dir", "dump", "output directory for the dumps")
 		resourcesFlag        = flag.String("resources", "", "resource to dump (e.g. 'configmaps,secrets'), empty for all")
