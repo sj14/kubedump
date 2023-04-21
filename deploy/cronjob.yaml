@@ -1,0 +1,66 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kubedump
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app: kubedump
+  name: kubedump
+  namespace: kubedump
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kubedump
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: view # adjust the clusterrole or create your own one when you need more permissions
+subjects:
+  - kind: ServiceAccount
+    name: kubedump
+    namespace: kubedump
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: kubedump
+  namespace: kubedump
+spec:
+  schedule: "@daily"
+  concurrencyPolicy: Replace
+  jobTemplate:
+    metadata:
+      name: kubedump
+      namespace: kubedump
+    spec:
+      template:
+        metadata:
+        spec:
+          serviceAccountName: kubedump
+          initContainers:
+            - image: ghcr.io/sj14/kubedump:latest # pin a fixed version
+              name: kubedump
+              args: ["-config", "", "-dir", "/dump"] # TODO: should be in a configmap
+              resources: {}
+              volumeMounts:
+                - mountPath: /dump
+                  name: dump-volume
+          containers:
+            - image: alpine # adjust the container with something you want to do, e.g. backup to s3
+              name: alpine
+              command:
+                - sleep
+                - infinity
+              resources: {}
+              volumeMounts:
+                - mountPath: /dump
+                  name: dump-volume
+          restartPolicy: OnFailure
+          volumes:
+            - name: dump-volume
+              emptyDir:
+                sizeLimit: 500Mi
