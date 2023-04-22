@@ -30,16 +30,16 @@ func TestSkipResource(t *testing.T) {
 			skip: true,
 		},
 		{
-			name: "verb get",
+			name: "verb list",
 			args: args{
-				res: metav1.APIResource{Verbs: metav1.Verbs{"get"}},
+				res: metav1.APIResource{Verbs: metav1.Verbs{"list"}},
 			},
 			skip: false,
 		},
 		{
 			name: "subresource",
 			args: args{
-				res: metav1.APIResource{Name: "resource/subresource", Verbs: metav1.Verbs{"get"}},
+				res: metav1.APIResource{Name: "resource/subresource", Verbs: metav1.Verbs{"list"}},
 			},
 			skip: true,
 		},
@@ -49,7 +49,7 @@ func TestSkipResource(t *testing.T) {
 			args: args{
 				res: metav1.APIResource{
 					Name:  "myresource",
-					Verbs: metav1.Verbs{"get"},
+					Verbs: metav1.Verbs{"list"},
 				},
 				wantResources:   []string{""},
 				ignoreResources: []string{""},
@@ -61,7 +61,7 @@ func TestSkipResource(t *testing.T) {
 			args: args{
 				res: metav1.APIResource{
 					Name:  "myresource",
-					Verbs: metav1.Verbs{"get"},
+					Verbs: metav1.Verbs{"list"},
 				},
 				wantResources: []string{"myresource"},
 			},
@@ -72,7 +72,7 @@ func TestSkipResource(t *testing.T) {
 			args: args{
 				res: metav1.APIResource{
 					Name:  "not-myresource",
-					Verbs: metav1.Verbs{"get"},
+					Verbs: metav1.Verbs{"list"},
 				},
 				wantResources: []string{"myresource"},
 			},
@@ -83,7 +83,7 @@ func TestSkipResource(t *testing.T) {
 			args: args{
 				res: metav1.APIResource{
 					Name:  "myresource",
-					Verbs: metav1.Verbs{"get"},
+					Verbs: metav1.Verbs{"list"},
 				},
 				ignoreResources: []string{"myresource"},
 			},
@@ -94,7 +94,7 @@ func TestSkipResource(t *testing.T) {
 			args: args{
 				res: metav1.APIResource{
 					Name:  "not-myresource",
-					Verbs: metav1.Verbs{"get"},
+					Verbs: metav1.Verbs{"list"},
 				},
 				ignoreResources: []string{"myresource"},
 			},

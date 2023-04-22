@@ -165,7 +165,7 @@ func main() {
 
 func skipResource(res metav1.APIResource, wantResources, ignoreResources []string) bool {
 	// check if we can even 'get' the resource
-	if !slices.Contains(res.Verbs, "get") {
+	if !slices.Contains(res.Verbs, "list") {
 		return true
 	}
 
