@@ -24,6 +24,11 @@ It's also possible to install via `go get`:
 go get -u github.com/sj14/kubedump
 ```
 
+### In-Cluster
+
+See [deploy/cronjob.yaml](./deploy/cronjob.yaml) as an example how to deploy a CronJob with kubedump.
+You have to adjust the file accordingly, for example to push the dumped data to a persistent storage.
+
 ## Usage
 
 ```text
@@ -31,7 +36,7 @@ Usage of kubedump:
   -clusterscoped
         dump cluster-wide resources (default true)
   -config string
-        path to the kubeconfig (default "~/.kube/config")
+        path to the kubeconfig, empty for in-cluster config (default "~/.kube/config")
   -context string
         context from the kubeconfig, empty for default
   -dir string
