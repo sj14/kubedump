@@ -1,6 +1,14 @@
 name: Docker
 on:
   push:
+    tags:
+      - "*"
+    paths:
+      - Dockerfile
+      - go.mod
+      - go.sum
+      - "**.go"
+      - ".github/workflows/docker.yaml"
 jobs:
   docker:
     permissions:

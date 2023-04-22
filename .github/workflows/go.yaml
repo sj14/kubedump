@@ -2,7 +2,10 @@ name: Go
 on:
   push:
     paths:
+      - go.mod
+      - go.sum
       - "**.go"
+      - ".github/workflows/go.yaml"
 jobs:
   build:
     name: Test
