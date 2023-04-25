@@ -50,7 +50,7 @@ func main() {
 		clusterscopedFlag    = flag.Bool("clusterscoped", true, "dump cluster-wide resources")
 		namespacedFlag       = flag.Bool("namespaced", true, "dump namespaced resources")
 		statelessFlag        = flag.Bool("stateless", true, "remove fields containing a state of the resource")
-		verboseFlag          = flag.Bool("verbose", false, "output the current progress")
+		verbosityFlag        = flag.Uint("verbosity", 1, "verbosity of the output (0-3)")
 		versionFlag          = flag.Bool("version", false, fmt.Sprintf("print version information of this release (%v)", version))
 	)
 	flag.Parse()
@@ -127,8 +127,8 @@ func main() {
 						Resource: res.Name,
 					}
 
-					if *verboseFlag {
-						fmt.Printf("processing: %s\n", gvr.String())
+					if *verbosityFlag > 1 {
+						fmt.Printf("processing group=%v resource=%v\n", gvr.Group, gvr.Resource)
 					}
 
 					unstrList, err := dynamicClient.Resource(gvr).List(context.Background(), metav1.ListOptions{})
@@ -148,6 +148,10 @@ func main() {
 						//		resource: "pod"		group: "metrics.k8s.io"
 						resourceAndGroup := strings.TrimSuffix(fmt.Sprintf("%s.%s", res.Name, group.Name), ".")
 
+						if *verbosityFlag > 2 {
+							fmt.Printf("processing manifest group=%v version=%v resource=%v namespace=%v name=%q\n", gvr.Group, gvr.Version, gvr.Resource, item.GetNamespace(), item.GetName())
+						}
+
 						if err := writeYAML(*outdirFlag, resourceAndGroup, item, *statelessFlag); err != nil {
 							log.Printf("failed writing %v/%v: %v\n", item.GetNamespace(), item.GetName(), err)
 							continue
@@ -160,7 +164,9 @@ func main() {
 	}
 
 	waitGroup.Wait()
-	fmt.Printf("loaded %d manifests in %v\n", writtenFiles, time.Since(start).Round(1*time.Millisecond))
+	if *verbosityFlag > 0 {
+		fmt.Printf("loaded %d manifests in %v\n", writtenFiles, time.Since(start).Round(1*time.Millisecond))
+	}
 }
 
 func skipResource(res metav1.APIResource, wantResources, ignoreResources []string) bool {

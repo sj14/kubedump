@@ -55,8 +55,8 @@ Usage of kubedump:
         remove fields containing a state of the resource (default true)
   -threads uint
         maximum number of threads (minimum 1) (default 10)
-  -verbose
-        output the current progress
+  -verbosity uint
+        verbosity of the output (0-3) (default 1)
   -version
         print version information of this release
 ```
