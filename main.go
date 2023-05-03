@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -30,6 +31,35 @@ var (
 	date    = "undefined"
 )
 
+func lookupEnvString(key string, defaultVal string) string {
+	if val, ok := os.LookupEnv(key); ok {
+		return val
+	}
+	return defaultVal
+}
+
+func lookupEnvBool(key string, defaultVal bool) bool {
+	if val, ok := os.LookupEnv(key); ok {
+		parsed, err := strconv.ParseBool(val)
+		if err != nil {
+			log.Fatalf("failed parsing %q as bool (%q): %v", val, key, err)
+		}
+		return parsed
+	}
+	return defaultVal
+}
+
+func lookupEnvUint64(key string, defaultVal uint64) uint64 {
+	if val, ok := os.LookupEnv(key); ok {
+		parsed, err := strconv.ParseUint(val, 10, 64)
+		if err != nil {
+			log.Fatalf("failed parsing %q as uint64 (%q): %v", val, key, err)
+		}
+		return parsed
+	}
+	return defaultVal
+}
+
 func main() {
 	start := time.Now()
 
@@ -39,27 +69,30 @@ func main() {
 	}
 
 	var (
-		kubeConfigPath       = flag.String("config", filepath.Join(homeDir, ".kube", "config"), "path to the kubeconfig, empty for in-cluster config")
-		kubeContext          = flag.String("context", "", "context from the kubeconfig, empty for default")
-		outdirFlag           = flag.String("dir", "dump", "output directory for the dumps")
-		resourcesFlag        = flag.String("resources", "", "resource to dump (e.g. 'configmaps,secrets'), empty for all")
-		ignoreResourcesFlag  = flag.String("ignore-resources", "", "resource to ignore (e.g. 'configmaps,secrets')")
-		namespacesFlag       = flag.String("namespaces", "", "namespace to dump (e.g. 'ns1,ns2'), empty for all")
-		ignoreNamespacesFlag = flag.String("ignore-namespaces", "", "namespace to ignore (e.g. 'ns1,ns2')")
-		maxThreadsFlag       = flag.Uint("threads", 10, "maximum number of threads (minimum 1)")
-		clusterscopedFlag    = flag.Bool("clusterscoped", true, "dump cluster-wide resources")
-		namespacedFlag       = flag.Bool("namespaced", true, "dump namespaced resources")
-		statelessFlag        = flag.Bool("stateless", true, "remove fields containing a state of the resource")
-		verbosityFlag        = flag.Uint("verbosity", 1, "verbosity of the output (0-3)")
-		versionFlag          = flag.Bool("version", false, fmt.Sprintf("print version information of this release (%v)", version))
+		kubeConfigPath       = flag.String("config", lookupEnvString("CONFIG", filepath.Join(homeDir, ".kube", "config")), "path to the kubeconfig, empty for in-cluster config")
+		kubeContext          = flag.String("context", lookupEnvString("CONTEXT", ""), "context from the kubeconfig, empty for default")
+		outdirFlag           = flag.String("dir", lookupEnvString("DIR", "dump"), "output directory for the dumps")
+		resourcesFlag        = flag.String("resources", lookupEnvString("RESOURCES", ""), "resource to dump (e.g. 'configmaps,secrets'), empty for all")
+		ignoreResourcesFlag  = flag.String("ignore-resources", lookupEnvString("IGNORE_RESOURCES", ""), "resource to ignore (e.g. 'configmaps,secrets')")
+		namespacesFlag       = flag.String("namespaces", lookupEnvString("NAMESPACES", ""), "namespace to dump (e.g. 'ns1,ns2'), empty for all")
+		ignoreNamespacesFlag = flag.String("ignore-namespaces", lookupEnvString("IGNORE_NAMESPACES", ""), "namespace to ignore (e.g. 'ns1,ns2')")
+		clusterscopedFlag    = flag.Bool("clusterscoped", lookupEnvBool("CLUSTERSCOPED", true), "dump cluster-wide resources")
+		namespacedFlag       = flag.Bool("namespaced", lookupEnvBool("NAMESPACED", true), "dump namespaced resources")
+		statelessFlag        = flag.Bool("stateless", lookupEnvBool("STATELESS", true), "remove fields containing a state of the resource")
+		versionFlag          = flag.Bool("version", lookupEnvBool("VERSION", false), fmt.Sprintf("print version information of this release (%v)", version))
+		maxThreadsFlag       = flag.Uint64("threads", lookupEnvUint64("THREADS", 10), "maximum number of threads (minimum 1)")
+		verbosityFlag        = flag.Uint64("verbosity", lookupEnvUint64("VERBOSITY", 1), "verbosity of the output (0-3)")
 	)
 	flag.Parse()
 
-	if *versionFlag {
+	if *versionFlag || *verbosityFlag > 1 {
 		fmt.Printf("version: %v\n", version)
 		fmt.Printf("commit: %v\n", commit)
 		fmt.Printf("date: %v\n", date)
-		os.Exit(0)
+
+		if *versionFlag {
+			os.Exit(0)
+		}
 	}
 
 	if *maxThreadsFlag <= 0 {
