@@ -35,6 +35,19 @@ subjects:
     name: kubedump
     namespace: kubedump
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubedump-config
+  namespace: kubedump
+data:
+  # adjust settings as desired
+  CONFIG: ""    # empty -> in-cluster config
+  DIR: "/dump"
+  VERBOSITY: "3"
+  IGNORE_NAMESPACES: kube-system,kube-public,kube-node-lease
+  IGNORE_RESOURCES: events
+---
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -55,8 +68,10 @@ spec:
           initContainers:
             - image: ghcr.io/sj14/kubedump:latest # pin a fixed version
               name: kubedump
-              args: ["-config", "", "-dir", "/dump"] # TODO: should be in a configmap
               resources: {}
+              envFrom:
+                - configMapRef:
+                    name: kubedump-config
               volumeMounts:
                 - mountPath: /dump
                   name: dump-volume

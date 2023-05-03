@@ -60,3 +60,5 @@ Usage of kubedump:
   -version
         print version information of this release
 ```
+
+All options can also be set as environment variables by using their uppercase flag names and changing dashes (`-`) with underscores (`_`), e.g. `ignore-namespaces` becomes `IGNORE_NAMESPACES`.
