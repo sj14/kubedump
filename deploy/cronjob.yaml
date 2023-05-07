@@ -16,11 +16,11 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: kubedump
 rules: # limit the groups/resources according to your (security) needs
-- apiGroups:
-  - '*'
-  resources:
-  - '*'
-  verbs: ["list"]
+  - apiGroups:
+      - "*"
+    resources:
+      - "*"
+    verbs: ["list"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -42,7 +42,7 @@ metadata:
   namespace: kubedump
 data:
   # adjust settings as desired
-  CONFIG: ""    # empty -> in-cluster config
+  CONFIG: "" # empty -> in-cluster config
   DIR: "/dump"
   VERBOSITY: "3"
   IGNORE_NAMESPACES: kube-system,kube-public,kube-node-lease
@@ -62,13 +62,18 @@ spec:
       namespace: kubedump
     spec:
       template:
-        metadata:
         spec:
           serviceAccountName: kubedump
           initContainers:
             - image: ghcr.io/sj14/kubedump:latest # pin a fixed version
               name: kubedump
-              resources: {}
+              resources:
+                requests:
+                  memory: "64Mi"
+                  cpu: "100m"
+                limits:
+                  memory: "128Mi"
+                  cpu: "500m"
               envFrom:
                 - configMapRef:
                     name: kubedump-config
@@ -81,7 +86,13 @@ spec:
               command:
                 - sleep
                 - infinity
-              resources: {}
+              resources:
+                requests:
+                  memory: "64Mi"
+                  cpu: "100m"
+                limits:
+                  memory: "128Mi"
+                  cpu: "500m"
               volumeMounts:
                 - mountPath: /dump
                   name: dump-volume
