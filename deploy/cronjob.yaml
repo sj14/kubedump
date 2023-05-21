@@ -70,9 +70,9 @@ spec:
               resources:
                 requests:
                   memory: "64Mi"
-                  cpu: "100m"
+                  cpu: "10m"
                 limits:
-                  memory: "128Mi"
+                  memory: "256Mi"
                   cpu: "500m"
               envFrom:
                 - configMapRef:
@@ -89,9 +89,9 @@ spec:
               resources:
                 requests:
                   memory: "64Mi"
-                  cpu: "100m"
+                  cpu: "10m"
                 limits:
-                  memory: "128Mi"
+                  memory: "256Mi"
                   cpu: "500m"
               volumeMounts:
                 - mountPath: /dump
