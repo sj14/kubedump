@@ -7,6 +7,77 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+func TestSkipGroup(t *testing.T) {
+	type args struct {
+		group        metav1.APIGroup
+		wantGroups   []string
+		ignoreGroups []string
+	}
+	tests := []struct {
+		name string
+		args args
+		skip bool
+	}{
+		{
+			name: "empty",
+			skip: false,
+		},
+		{
+			name: "no want/ignore",
+			args: args{group: metav1.APIGroup{Name: "currentGroup"}},
+			skip: false,
+		},
+		{
+			name: "not wanted",
+			args: args{
+				group:      metav1.APIGroup{Name: "currentGroup"},
+				wantGroups: []string{"notCurrentGroup"},
+			},
+			skip: true,
+		},
+		{
+			name: "wanted",
+			args: args{
+				group:      metav1.APIGroup{Name: "currentGroup"},
+				wantGroups: []string{"currentGroup"},
+			},
+			skip: false,
+		},
+		{
+			name: "ignored",
+			args: args{
+				group:        metav1.APIGroup{Name: "currentGroup"},
+				ignoreGroups: []string{"currentGroup"},
+			},
+			skip: true,
+		},
+		{
+			name: "not ignored",
+			args: args{
+				group:        metav1.APIGroup{Name: "currentGroup"},
+				ignoreGroups: []string{"notCurrentGroup"},
+			},
+			skip: false,
+		},
+		{
+			name: "wanted and ignored",
+			args: args{
+				group:        metav1.APIGroup{Name: "currentGroup"},
+				wantGroups:   []string{"currentGroup"},
+				ignoreGroups: []string{"currentGroup"},
+			},
+			skip: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := skipGroup(tt.args.group, tt.args.wantGroups, tt.args.ignoreGroups); got != tt.skip {
+				t.Errorf("skipGroup() = %v, want %v", got, tt.skip)
+			}
+		})
+	}
+}
+
 func TestSkipResource(t *testing.T) {
 	type args struct {
 		res             metav1.APIResource
@@ -104,7 +175,7 @@ func TestSkipResource(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := skipResource(tt.args.res, tt.args.wantResources, tt.args.ignoreResources); got != tt.skip {
-				t.Errorf("ignoreResource() = %v, want %v", got, tt.skip)
+				t.Errorf("skipResource() = %v, want %v", got, tt.skip)
 			}
 		})
 	}
@@ -201,7 +272,7 @@ func TestSkipItem(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := skipItem(tt.args.item, tt.args.namespaced, tt.args.clusterscoped, tt.args.wantNamespaces, tt.args.ignoreNamespaces); got != tt.skip {
-				t.Errorf("ignoreItem() = %v, want %v", got, tt.skip)
+				t.Errorf("skipItem() = %v, want %v", got, tt.skip)
 			}
 		})
 	}
