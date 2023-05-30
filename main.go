@@ -76,6 +76,7 @@ func main() {
 		ignoreResourcesFlag  = flag.String("ignore-resources", lookupEnvString("IGNORE_RESOURCES", ""), "resource to ignore (e.g. 'configmaps,secrets')")
 		namespacesFlag       = flag.String("namespaces", lookupEnvString("NAMESPACES", ""), "namespace to dump (e.g. 'ns1,ns2'), empty for all")
 		ignoreNamespacesFlag = flag.String("ignore-namespaces", lookupEnvString("IGNORE_NAMESPACES", ""), "namespace to ignore (e.g. 'ns1,ns2')")
+		ignoreGroupsFlag     = flag.String("ignore-groups", lookupEnvString("IGNORE_GROUPS", ""), "regoup to ignore (e.g. 'metrics.k8s.io,cert-manager.io')")
 		clusterscopedFlag    = flag.Bool("clusterscoped", lookupEnvBool("CLUSTERSCOPED", true), "dump cluster-wide resources")
 		namespacedFlag       = flag.Bool("namespaced", lookupEnvBool("NAMESPACED", true), "dump namespaced resources")
 		statelessFlag        = flag.Bool("stateless", lookupEnvBool("STATELESS", true), "remove fields containing a state of the resource")
@@ -104,6 +105,7 @@ func main() {
 		wantNamespaces   = strings.Split(strings.ToLower(*namespacesFlag), ",")
 		ignoreResources  = strings.Split(strings.ToLower(*ignoreResourcesFlag), ",")
 		ignoreNamespaces = strings.Split(strings.ToLower(*ignoreNamespacesFlag), ",")
+		ignoreGroups     = strings.Split(strings.ToLower(*ignoreGroupsFlag), ",")
 	)
 
 	kubeConfig, err := buildConfigFromFlags(*kubeContext, *kubeConfigPath)
@@ -133,6 +135,10 @@ func main() {
 	)
 
 	for _, group := range groups.Groups {
+		if skipGroup(group, ignoreGroups) {
+			continue
+		}
+
 		for _, version := range group.Versions {
 			resources, err := clientset.DiscoveryClient.ServerResourcesForGroupVersion(version.GroupVersion)
 			if err != nil {
@@ -200,6 +206,14 @@ func main() {
 	if *verbosityFlag > 0 {
 		fmt.Printf("loaded %d manifests in %v\n", writtenFiles, time.Since(start).Round(1*time.Millisecond))
 	}
+}
+
+func skipGroup(group metav1.APIGroup, ignoreGroups []string) bool {
+	if len(ignoreGroups) > 0 && ignoreGroups[0] != "" && slices.Contains(ignoreGroups, group.Name) {
+		return true
+	}
+
+	return false
 }
 
 func skipResource(res metav1.APIResource, wantResources, ignoreResources []string) bool {
