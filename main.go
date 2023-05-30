@@ -72,11 +72,12 @@ func main() {
 		kubeConfigPath       = flag.String("config", lookupEnvString("CONFIG", filepath.Join(homeDir, ".kube", "config")), "path to the kubeconfig, empty for in-cluster config")
 		kubeContext          = flag.String("context", lookupEnvString("CONTEXT", ""), "context from the kubeconfig, empty for default")
 		outdirFlag           = flag.String("dir", lookupEnvString("DIR", "dump"), "output directory for the dumps")
-		resourcesFlag        = flag.String("resources", lookupEnvString("RESOURCES", ""), "resource to dump (e.g. 'configmaps,secrets'), empty for all")
-		ignoreResourcesFlag  = flag.String("ignore-resources", lookupEnvString("IGNORE_RESOURCES", ""), "resource to ignore (e.g. 'configmaps,secrets')")
-		namespacesFlag       = flag.String("namespaces", lookupEnvString("NAMESPACES", ""), "namespace to dump (e.g. 'ns1,ns2'), empty for all")
-		ignoreNamespacesFlag = flag.String("ignore-namespaces", lookupEnvString("IGNORE_NAMESPACES", ""), "namespace to ignore (e.g. 'ns1,ns2')")
-		ignoreGroupsFlag     = flag.String("ignore-groups", lookupEnvString("IGNORE_GROUPS", ""), "regoup to ignore (e.g. 'metrics.k8s.io,cert-manager.io')")
+		resourcesFlag        = flag.String("resources", lookupEnvString("RESOURCES", ""), "resources to dump (e.g. 'configmaps,secrets'), empty for all")
+		ignoreResourcesFlag  = flag.String("ignore-resources", lookupEnvString("IGNORE_RESOURCES", ""), "resources to ignore (e.g. 'configmaps,secrets')")
+		namespacesFlag       = flag.String("namespaces", lookupEnvString("NAMESPACES", ""), "namespaces to dump (e.g. 'ns1,ns2'), empty for all")
+		ignoreNamespacesFlag = flag.String("ignore-namespaces", lookupEnvString("IGNORE_NAMESPACES", ""), "namespaces to ignore (e.g. 'ns1,ns2')")
+		groupsFlag           = flag.String("groups", lookupEnvString("GROUPS", ""), "groups to dump (e.g. 'metrics.k8s.io,coordination.k8s.io')")
+		ignoreGroupsFlag     = flag.String("ignore-groups", lookupEnvString("IGNORE_GROUPS", ""), "groups to ignore (e.g. 'metrics.k8s.io,coordination.k8s.io')")
 		clusterscopedFlag    = flag.Bool("clusterscoped", lookupEnvBool("CLUSTERSCOPED", true), "dump cluster-wide resources")
 		namespacedFlag       = flag.Bool("namespaced", lookupEnvBool("NAMESPACED", true), "dump namespaced resources")
 		statelessFlag        = flag.Bool("stateless", lookupEnvBool("STATELESS", true), "remove fields containing a state of the resource")
@@ -103,6 +104,7 @@ func main() {
 	var (
 		wantResources    = strings.Split(strings.ToLower(*resourcesFlag), ",")
 		wantNamespaces   = strings.Split(strings.ToLower(*namespacesFlag), ",")
+		wantGroups       = strings.Split(strings.ToLower(*groupsFlag), ",")
 		ignoreResources  = strings.Split(strings.ToLower(*ignoreResourcesFlag), ",")
 		ignoreNamespaces = strings.Split(strings.ToLower(*ignoreNamespacesFlag), ",")
 		ignoreGroups     = strings.Split(strings.ToLower(*ignoreGroupsFlag), ",")
@@ -135,7 +137,7 @@ func main() {
 	)
 
 	for _, group := range groups.Groups {
-		if skipGroup(group, ignoreGroups) {
+		if skipGroup(group, wantGroups, ignoreGroups) {
 			continue
 		}
 
@@ -208,7 +210,13 @@ func main() {
 	}
 }
 
-func skipGroup(group metav1.APIGroup, ignoreGroups []string) bool {
+func skipGroup(group metav1.APIGroup, wantGroups, ignoreGroups []string) bool {
+	// check if we got the specified group (if any groups were specified)
+	if len(wantGroups) > 0 && wantGroups[0] != "" && !slices.Contains(wantGroups, group.Name) {
+		return true
+	}
+
+	// check if we got a group to ignore (if any groups were specified)
 	if len(ignoreGroups) > 0 && ignoreGroups[0] != "" && slices.Contains(ignoreGroups, group.Name) {
 		return true
 	}

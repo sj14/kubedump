@@ -41,16 +41,20 @@ Usage of kubedump:
         context from the kubeconfig, empty for default
   -dir string
         output directory for the dumps (default "dump")
+  -groups string
+        groups to dump (e.g. 'metrics.k8s.io,coordination.k8s.io')
+  -ignore-groups string
+        groups to ignore (e.g. 'metrics.k8s.io,coordination.k8s.io')
   -ignore-namespaces string
-        namespace to ignore (e.g. 'ns1,ns2')
+        namespaces to ignore (e.g. 'ns1,ns2')
   -ignore-resources string
-        resource to ignore (e.g. 'configmaps,secrets')
+        resources to ignore (e.g. 'configmaps,secrets')
   -namespaced
         dump namespaced resources (default true)
   -namespaces string
-        namespace to dump (e.g. 'ns1,ns2'), empty for all
+        namespaces to dump (e.g. 'ns1,ns2'), empty for all
   -resources string
-        resource to dump (e.g. 'configmaps,secrets'), empty for all
+        resources to dump (e.g. 'configmaps,secrets'), empty for all
   -stateless
         remove fields containing a state of the resource (default true)
   -threads uint

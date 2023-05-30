@@ -46,6 +46,7 @@ data:
   DIR: "/dump"
   VERBOSITY: "3"
   IGNORE_NAMESPACES: kube-system,kube-public,kube-node-lease
+  IGNORE_GROUPS: metrics.k8s.io
   IGNORE_RESOURCES: events
 ---
 apiVersion: batch/v1
