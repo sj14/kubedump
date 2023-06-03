@@ -69,11 +69,11 @@ func main() {
 	}
 
 	var (
-		kubeConfigPath = flag.String("config", lookupEnvString("CONFIG", filepath.Join(homeDir, ".kube", "config")), "path to the kubeconfig, empty for in-cluster config")
-		kubeContext    = flag.String("context", lookupEnvString("CONTEXT", ""), "context from the kubeconfig, empty for default")
-		outdirFlag     = flag.String("dir", lookupEnvString("DIR", "dump"), "output directory for the dumps")
-		labelsFlag     = flag.String("labels", lookupEnvString("LABELS", ""), "filter resources for labels, e.g. key1=value1,key2=value2")
-		// ignoreLabelsFlag     = flag.String("ignore-labels", lookupEnvString("IGNORE_LABELS", ""), "filter resources for labels, e.g. key1=value1,key2=value2")
+		kubeConfigPath       = flag.String("config", lookupEnvString("CONFIG", filepath.Join(homeDir, ".kube", "config")), "path to the kubeconfig, empty for in-cluster config")
+		kubeContext          = flag.String("context", lookupEnvString("CONTEXT", ""), "context from the kubeconfig, empty for default")
+		outdirFlag           = flag.String("dir", lookupEnvString("DIR", "dump"), "output directory for the dumps")
+		labelsFlag           = flag.String("labels", lookupEnvString("LABELS", ""), "dump resources with the given labels (e.g. key1=value1,key2=value2), empty for all")
+		ignoreLabelsFlag     = flag.String("ignore-labels", lookupEnvString("IGNORE_LABELS", ""), "ignore resources with the given labels (e.g. key1=value1,key2=value2)")
 		resourcesFlag        = flag.String("resources", lookupEnvString("RESOURCES", ""), "resources to dump (e.g. 'configmaps,secrets'), empty for all")
 		ignoreResourcesFlag  = flag.String("ignore-resources", lookupEnvString("IGNORE_RESOURCES", ""), "resources to ignore (e.g. 'configmaps,secrets')")
 		namespacesFlag       = flag.String("namespaces", lookupEnvString("NAMESPACES", ""), "namespaces to dump (e.g. 'ns1,ns2'), empty for all")
@@ -123,29 +123,16 @@ func main() {
 		log.Fatalf("failed creating dynamic client: %v\n", err)
 	}
 
-	wantLabelsKeyValue := strings.Split(*labelsFlag, ",")
-	if len(wantLabelsKeyValue) == 1 && wantLabelsKeyValue[0] == "" {
-		wantLabelsKeyValue = nil
-	}
-
-	wantLabels := make(map[string]string)
-	for _, keyVal := range wantLabelsKeyValue {
-		key, val, ok := strings.Cut(keyVal, "=")
-		if !ok {
-			log.Fatalf("failed parsing labels flag at %q\n", keyVal)
-		}
-
-		wantLabels[key] = val
-	}
-
 	var (
 		writtenFiles uint64
 		waitGroup    sync.WaitGroup
 		threadGuard  = make(chan struct{}, *maxThreadsFlag)
 
+		wantLabels       = parseLabelsFlag(*labelsFlag)
 		wantResources    = strings.Split(strings.ToLower(*resourcesFlag), ",")
 		wantNamespaces   = strings.Split(strings.ToLower(*namespacesFlag), ",")
 		wantGroups       = strings.Split(strings.ToLower(*groupsFlag), ",")
+		ignoreLabels     = parseLabelsFlag(*ignoreLabelsFlag)
 		ignoreResources  = strings.Split(strings.ToLower(*ignoreResourcesFlag), ",")
 		ignoreNamespaces = strings.Split(strings.ToLower(*ignoreNamespacesFlag), ",")
 		ignoreGroups     = strings.Split(strings.ToLower(*ignoreGroupsFlag), ",")
@@ -198,7 +185,7 @@ func main() {
 							continue
 						}
 
-						if skipLabels(item.GetLabels(), wantLabels) {
+						if skipLabels(item.GetLabels(), wantLabels, ignoreLabels) {
 							continue
 						}
 
@@ -227,6 +214,25 @@ func main() {
 	if *verbosityFlag > 0 {
 		fmt.Printf("loaded %d manifests in %v\n", writtenFiles, time.Since(start).Round(1*time.Millisecond))
 	}
+}
+
+func parseLabelsFlag(labelsFlag string) map[string]string {
+	wantLabelsKeyValue := strings.Split(labelsFlag, ",")
+	if len(wantLabelsKeyValue) == 1 && wantLabelsKeyValue[0] == "" {
+		return nil
+	}
+
+	wantLabels := make(map[string]string)
+	for _, keyVal := range wantLabelsKeyValue {
+		key, val, ok := strings.Cut(keyVal, "=")
+		if !ok {
+			log.Fatalf("failed parsing (ignore-)labels flag at %q\n", keyVal)
+		}
+
+		wantLabels[key] = val
+	}
+
+	return wantLabels
 }
 
 func skipGroup(group metav1.APIGroup, wantGroups, ignoreGroups []string) bool {
@@ -289,7 +295,11 @@ func skipItem(item unstructured.Unstructured, namespaced, clusterscoped bool, wa
 	return false
 }
 
-func skipLabels(got, want map[string]string) bool {
+func skipLabels(got, want, ignore map[string]string) bool {
+	return skipLabelsWant(got, want) || skipLabelsIgnore(got, ignore)
+}
+
+func skipLabelsWant(got, want map[string]string) bool {
 	if len(want) == 0 {
 		return false
 	}
@@ -303,6 +313,22 @@ func skipLabels(got, want map[string]string) bool {
 	}
 
 	return true
+}
+
+func skipLabelsIgnore(got, ignore map[string]string) bool {
+	if len(ignore) == 0 {
+		return false
+	}
+
+	for ignoreKey, ignoreVal := range ignore {
+		for gotKey, gotVal := range got {
+			if ignoreKey == gotKey {
+				return ignoreVal == gotVal
+			}
+		}
+	}
+
+	return false
 }
 
 func writeYAML(outDir, resourceAndGroup string, item unstructured.Unstructured, stateless bool) error {
