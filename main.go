@@ -69,14 +69,16 @@ func main() {
 	}
 
 	var (
-		kubeConfigPath       = flag.String("config", lookupEnvString("CONFIG", filepath.Join(homeDir, ".kube", "config")), "path to the kubeconfig, empty for in-cluster config")
-		kubeContext          = flag.String("context", lookupEnvString("CONTEXT", ""), "context from the kubeconfig, empty for default")
-		outdirFlag           = flag.String("dir", lookupEnvString("DIR", "dump"), "output directory for the dumps")
+		kubeConfigPath = flag.String("config", lookupEnvString("CONFIG", filepath.Join(homeDir, ".kube", "config")), "path to the kubeconfig, empty for in-cluster config")
+		kubeContext    = flag.String("context", lookupEnvString("CONTEXT", ""), "context from the kubeconfig, empty for default")
+		outdirFlag     = flag.String("dir", lookupEnvString("DIR", "dump"), "output directory for the dumps")
+		labelsFlag     = flag.String("labels", lookupEnvString("LABELS", ""), "filter resources for labels, e.g. key1=value1,key2=value2")
+		// ignoreLabelsFlag     = flag.String("ignore-labels", lookupEnvString("IGNORE_LABELS", ""), "filter resources for labels, e.g. key1=value1,key2=value2")
 		resourcesFlag        = flag.String("resources", lookupEnvString("RESOURCES", ""), "resources to dump (e.g. 'configmaps,secrets'), empty for all")
 		ignoreResourcesFlag  = flag.String("ignore-resources", lookupEnvString("IGNORE_RESOURCES", ""), "resources to ignore (e.g. 'configmaps,secrets')")
 		namespacesFlag       = flag.String("namespaces", lookupEnvString("NAMESPACES", ""), "namespaces to dump (e.g. 'ns1,ns2'), empty for all")
 		ignoreNamespacesFlag = flag.String("ignore-namespaces", lookupEnvString("IGNORE_NAMESPACES", ""), "namespaces to ignore (e.g. 'ns1,ns2')")
-		groupsFlag           = flag.String("groups", lookupEnvString("GROUPS", ""), "groups to dump (e.g. 'metrics.k8s.io,coordination.k8s.io')")
+		groupsFlag           = flag.String("groups", lookupEnvString("GROUPS", ""), "groups to dump (e.g. 'metrics.k8s.io,coordination.k8s.io'), empty for all")
 		ignoreGroupsFlag     = flag.String("ignore-groups", lookupEnvString("IGNORE_GROUPS", ""), "groups to ignore (e.g. 'metrics.k8s.io,coordination.k8s.io')")
 		clusterscopedFlag    = flag.Bool("clusterscoped", lookupEnvBool("CLUSTERSCOPED", true), "dump cluster-wide resources")
 		namespacedFlag       = flag.Bool("namespaced", lookupEnvBool("NAMESPACED", true), "dump namespaced resources")
@@ -101,15 +103,6 @@ func main() {
 		log.Fatalln("minimum number of threads is 1")
 	}
 
-	var (
-		wantResources    = strings.Split(strings.ToLower(*resourcesFlag), ",")
-		wantNamespaces   = strings.Split(strings.ToLower(*namespacesFlag), ",")
-		wantGroups       = strings.Split(strings.ToLower(*groupsFlag), ",")
-		ignoreResources  = strings.Split(strings.ToLower(*ignoreResourcesFlag), ",")
-		ignoreNamespaces = strings.Split(strings.ToLower(*ignoreNamespacesFlag), ",")
-		ignoreGroups     = strings.Split(strings.ToLower(*ignoreGroupsFlag), ",")
-	)
-
 	kubeConfig, err := buildConfigFromFlags(*kubeContext, *kubeConfigPath)
 	if err != nil {
 		log.Fatalf("failed getting Kubernetes config: %v\n", err)
@@ -130,10 +123,32 @@ func main() {
 		log.Fatalf("failed creating dynamic client: %v\n", err)
 	}
 
+	wantLabelsKeyValue := strings.Split(*labelsFlag, ",")
+	if len(wantLabelsKeyValue) == 1 && wantLabelsKeyValue[0] == "" {
+		wantLabelsKeyValue = nil
+	}
+
+	wantLabels := make(map[string]string)
+	for _, keyVal := range wantLabelsKeyValue {
+		key, val, ok := strings.Cut(keyVal, "=")
+		if !ok {
+			log.Fatalf("failed parsing labels flag at %q\n", keyVal)
+		}
+
+		wantLabels[key] = val
+	}
+
 	var (
 		writtenFiles uint64
 		waitGroup    sync.WaitGroup
 		threadGuard  = make(chan struct{}, *maxThreadsFlag)
+
+		wantResources    = strings.Split(strings.ToLower(*resourcesFlag), ",")
+		wantNamespaces   = strings.Split(strings.ToLower(*namespacesFlag), ",")
+		wantGroups       = strings.Split(strings.ToLower(*groupsFlag), ",")
+		ignoreResources  = strings.Split(strings.ToLower(*ignoreResourcesFlag), ",")
+		ignoreNamespaces = strings.Split(strings.ToLower(*ignoreNamespacesFlag), ",")
+		ignoreGroups     = strings.Split(strings.ToLower(*ignoreGroupsFlag), ",")
 	)
 
 	for _, group := range groups.Groups {
@@ -180,6 +195,10 @@ func main() {
 
 					for _, item := range unstrList.Items {
 						if skipItem(item, *namespacedFlag, *clusterscopedFlag, wantNamespaces, ignoreNamespaces) {
+							continue
+						}
+
+						if skipLabels(item.GetLabels(), wantLabels) {
 							continue
 						}
 
@@ -268,6 +287,22 @@ func skipItem(item unstructured.Unstructured, namespaced, clusterscoped bool, wa
 	}
 
 	return false
+}
+
+func skipLabels(got, want map[string]string) bool {
+	if len(want) == 0 {
+		return false
+	}
+
+	for wantKey, wantVal := range want {
+		for gotKey, gotVal := range got {
+			if wantKey == gotKey {
+				return wantVal != gotVal
+			}
+		}
+	}
+
+	return true
 }
 
 func writeYAML(outDir, resourceAndGroup string, item unstructured.Unstructured, stateless bool) error {
