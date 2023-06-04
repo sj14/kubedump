@@ -1,11 +1,36 @@
 package main
 
 import (
+	"reflect"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
+
+func TestParseLabelsFlag(t *testing.T) {
+	tests := []struct {
+		name       string
+		labelsFlag string
+		want       map[string]string
+	}{
+		{
+			name: "empty",
+		},
+		{
+			name:       "happy",
+			labelsFlag: "key0=value0,key1=value1",
+			want:       map[string]string{"key0": "value0", "key1": "value1"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := parseLabelsFlag(tt.labelsFlag); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("parseLabelsFlag() = %#v, want %#v", got, tt.want)
+			}
+		})
+	}
+}
 
 func TestSkipLabels(t *testing.T) {
 	type args struct {
