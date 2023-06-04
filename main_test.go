@@ -1,11 +1,116 @@
 package main
 
 import (
+	"reflect"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
+
+func TestParseLabelsFlag(t *testing.T) {
+	tests := []struct {
+		name       string
+		labelsFlag string
+		want       map[string]string
+	}{
+		{
+			name: "empty",
+		},
+		{
+			name:       "happy",
+			labelsFlag: "key0=value0,key1=value1",
+			want:       map[string]string{"key0": "value0", "key1": "value1"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := parseLabelsFlag(tt.labelsFlag); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("parseLabelsFlag() = %#v, want %#v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSkipLabels(t *testing.T) {
+	type args struct {
+		gotLabels    map[string]string
+		wantLabels   map[string]string
+		ignoreLabels map[string]string
+	}
+	tests := []struct {
+		name string
+		args args
+		skip bool
+	}{
+		{
+			name: "empty",
+			skip: false,
+		},
+		{
+			name: "no want/ignore",
+			args: args{gotLabels: map[string]string{"key0": "value0"}},
+			skip: false,
+		},
+		{
+			name: "want same",
+			args: args{
+				gotLabels:  map[string]string{"key0": "value0"},
+				wantLabels: map[string]string{"key0": "value0"},
+			},
+			skip: false,
+		},
+		{
+			name: "want different",
+			args: args{
+				gotLabels:  map[string]string{"key0": "value0"},
+				wantLabels: map[string]string{"key3": "value3"},
+			},
+			skip: true,
+		},
+		{
+			name: "ignore same",
+			args: args{
+				gotLabels:    map[string]string{"key0": "value0"},
+				ignoreLabels: map[string]string{"key0": "value0"},
+			},
+			skip: true,
+		},
+		{
+			name: "ignore different",
+			args: args{
+				gotLabels:    map[string]string{"key0": "value0"},
+				ignoreLabels: map[string]string{"key3": "value3"},
+			},
+			skip: false,
+		},
+		{
+			name: "multiple want",
+			args: args{
+				gotLabels:    map[string]string{"key0": "value0", "key1": "value1", "key2": "value2"},
+				wantLabels:   map[string]string{"key3": "value3", "key1": "value1"},
+				ignoreLabels: map[string]string{"key3": "value3"},
+			},
+			skip: false,
+		},
+		{
+			name: "multiple ignore",
+			args: args{
+				gotLabels:    map[string]string{"key0": "value0", "key1": "value1", "key2": "value2"},
+				wantLabels:   map[string]string{"key3": "value3", "key1": "value1"},
+				ignoreLabels: map[string]string{"key1": "value1", "key3": "value3"},
+			},
+			skip: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := skipLabels(tt.args.gotLabels, tt.args.wantLabels, tt.args.ignoreLabels); got != tt.skip {
+				t.Errorf("skipLabels() = %v, want %v", got, tt.skip)
+			}
+		})
+	}
+}
 
 func TestSkipGroup(t *testing.T) {
 	type args struct {
