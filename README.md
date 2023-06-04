@@ -42,13 +42,17 @@ Usage of kubedump:
   -dir string
         output directory for the dumps (default "dump")
   -groups string
-        groups to dump (e.g. 'metrics.k8s.io,coordination.k8s.io')
+        groups to dump (e.g. 'metrics.k8s.io,coordination.k8s.io'), empty for all
   -ignore-groups string
         groups to ignore (e.g. 'metrics.k8s.io,coordination.k8s.io')
+  -ignore-labels string
+        ignore resources with the given labels (e.g. key1=value1,key2=value2)
   -ignore-namespaces string
         namespaces to ignore (e.g. 'ns1,ns2')
   -ignore-resources string
         resources to ignore (e.g. 'configmaps,secrets')
+  -labels string
+        dump resources with the given labels (e.g. key1=value1,key2=value2), empty for all
   -namespaced
         dump namespaced resources (default true)
   -namespaces string
