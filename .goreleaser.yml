@@ -20,7 +20,7 @@ snapshot:
 brews:
   - name: kubedump
     skip_upload: auto
-    tap:
+    repository:
       owner: sj14
       name: homebrew-tap
     description: "Tool for dumping manifests from your Kubernetes clusters"
