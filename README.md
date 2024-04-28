@@ -18,10 +18,10 @@ brew install sj14/tap/kubedump
 
 ### Manually
 
-It's also possible to install via `go get`:
+It's also possible to install via `go install`:
 
 ``` text
-go get -u github.com/sj14/kubedump
+go install github.com/sj14/kubedump@latest
 ```
 
 ### In-Cluster
