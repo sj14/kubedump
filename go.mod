@@ -3,7 +3,7 @@ module github.com/sj14/kubedump
 go 1.22.2
 
 require (
-	k8s.io/apimachinery v0.31.1
+	k8s.io/apimachinery v0.31.2
 	k8s.io/client-go v0.31.1
 	sigs.k8s.io/yaml v1.4.0
 )
