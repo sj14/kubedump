@@ -10,6 +10,6 @@ RUN go mod download
 RUN CGO_ENABLED=0 go build -o /go/bin/app
 
 # Final stage
-FROM gcr.io/distroless/static-debian11
+FROM gcr.io/distroless/static-debian12
 COPY --from=build /go/bin/app /
 ENTRYPOINT ["/app"]
