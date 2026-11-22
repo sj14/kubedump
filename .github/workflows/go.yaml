@@ -5,7 +5,7 @@ on:
       - go.mod
       - go.sum
       - "**.go"
-      - ".github/workflows/go.yaml"
+      - ".github/workflows/**"
 jobs:
   build:
     name: Test
